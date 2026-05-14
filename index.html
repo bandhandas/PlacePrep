@@ -927,7 +927,7 @@ CGPA: 8.7/10 | Relevant: DSA, DBMS, OS, Networks"></textarea>
   </div>
 </div>
 
-<script>
+<script type="module">
 let currentUser = null;
 let currentCoSheet = null;
 let csDiffFilter = 'All';
@@ -2029,116 +2029,143 @@ function updateTaskProg(){
 }
 
 // ════════════════════════════════════════════════════════
-// AUTH SYSTEM
+// FIREBASE AUTH SYSTEM
 // ════════════════════════════════════════════════════════
-// ════════════════════════════════════════════════════════
-// AUTH SYSTEM — FIXED: passwords remembered across sessions
-// ════════════════════════════════════════════════════════
-function getUsers(){
-  // Merge from two storage keys for robustness
-  try{ return JSON.parse(localStorage.getItem('pp_users')||'[]'); }catch(e){ return []; }
-}
-function saveUsers(users){
-  localStorage.setItem('pp_users', JSON.stringify(users));
-}
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCg3yEsg9I1KbwvzjrapET3UxmMyakgfks",
+  authDomain: "placeprep-ab3e8.firebaseapp.com",
+  projectId: "placeprep-ab3e8",
+  storageBucket: "placeprep-ab3e8.firebasestorage.app",
+  messagingSenderId: "899609645040",
+  appId: "1:899609645040:web:02703b4c203c59fdb1d735"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
 
 function initApp(){
-  const s = localStorage.getItem('pp_session');
-  if(s){
-    try{
-      const saved = JSON.parse(s);
-      const users = getUsers();
-      const valid = users.find(u=>u.email===saved.email)
-                 || saved.email==='demo@placeprep.in';
-      if(valid || saved._guest){
-        currentUser = saved;
-        updateUserUI();
-        loadProgress();       // loads dsaProblems + tasks from localStorage
-        updateDashStats();    // updates sidebar XP, dashboard stats
-        renderDashTasks();
-        renderDashRecent();
-        renderCompanies();
-        renderLeaderboard();
-        renderHeatmap();
-        renderTasks('streak-tasks');
-        updateTaskProg();
-        initChat();
-        document.getElementById('login-screen').style.display='none';
-        return;
-      }
-    }catch(e){ console.error('Session restore error',e); }
-  }
-  // No valid session — show login
   renderCompanies();
   renderLeaderboard();
   initChat();
+  // Show login while Firebase checks session
   document.getElementById('login-screen').style.display='flex';
+
+  onAuthStateChanged(auth, async (fbUser) => {
+    if(fbUser){
+      // Fetch display name from Firestore if not in profile
+      let name = fbUser.displayName || fbUser.email.split('@')[0];
+      try {
+        const snap = await getDoc(doc(db,'users', fbUser.uid));
+        if(snap.exists() && snap.data().name) name = snap.data().name;
+      } catch(e){}
+      currentUser = { name, email: fbUser.email, uid: fbUser.uid };
+      document.getElementById('login-screen').style.display='none';
+      updateUserUI();
+      loadProgress();
+      updateDashStats();
+      renderDashTasks();
+      renderDashRecent();
+      renderHeatmap();
+      renderTasks('streak-tasks');
+      updateTaskProg();
+    } else {
+      currentUser = null;
+      document.getElementById('login-screen').style.display='flex';
+    }
+  });
 }
 
-function doLogin(){
+async function doLogin(){
   const email = document.getElementById('login-email').value.trim().toLowerCase();
   const pass  = document.getElementById('login-pass').value;
   const err   = document.getElementById('login-err');
   if(!email||!pass){ showAuthErr(err,'Please enter your email and password.'); return; }
 
-  // Demo account
+  // Demo account shortcut
   if(email==='demo@placeprep.in' && pass==='demo123'){
-    startSession({name:'Demo User', email:'demo@placeprep.in'});
+    currentUser = {name:'Demo User', email:'demo@placeprep.in', uid:'demo'};
+    document.getElementById('login-screen').style.display='none';
+    updateUserUI(); loadProgress(); updateDashStats(); renderDashTasks();
+    renderDashRecent(); renderHeatmap(); renderTasks('streak-tasks'); updateTaskProg();
     return;
   }
-  // Registered users
-  const users = getUsers();
-  const found = users.find(u=>u.email===email && u.pass===pass);
-  if(found){
-    startSession(found);
-  } else {
-    // Check if email exists but wrong password
-    const exists = users.find(u=>u.email===email);
-    if(exists){ showAuthErr(err,'Wrong password. Please try again.'); }
-    else { showAuthErr(err,'No account found. Please register first!'); }
+
+  const btn = document.querySelector('#login-mode .login-btn');
+  if(btn){ btn.textContent='Signing in…'; btn.disabled=true; }
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    // onAuthStateChanged will handle the rest
+  } catch(e) {
+    let msg = 'Sign in failed. Please try again.';
+    if(e.code==='auth/user-not-found')   msg='No account found. Please register first!';
+    if(e.code==='auth/wrong-password')   msg='Wrong password. Please try again.';
+    if(e.code==='auth/invalid-email')    msg='Please enter a valid email address.';
+    if(e.code==='auth/too-many-requests')msg='Too many attempts. Please try again later.';
+    if(e.code==='auth/invalid-credential')msg='Wrong email or password. Please try again.';
+    showAuthErr(err, msg);
+  } finally {
+    if(btn){ btn.textContent='Sign In →'; btn.disabled=false; }
   }
 }
 
-function doRegister(){
+async function doRegister(){
   const name  = document.getElementById('reg-name').value.trim();
   const email = document.getElementById('reg-email').value.trim().toLowerCase();
   const pass  = document.getElementById('reg-pass').value;
   const err   = document.getElementById('reg-err');
-  if(!name)            { showAuthErr(err,'Please enter your full name.'); return; }
-  if(!email)           { showAuthErr(err,'Please enter your email.'); return; }
-  if(pass.length<6)    { showAuthErr(err,'Password must be at least 6 characters.'); return; }
+  if(!name)         { showAuthErr(err,'Please enter your full name.'); return; }
+  if(!email)        { showAuthErr(err,'Please enter your email.'); return; }
+  if(pass.length<6) { showAuthErr(err,'Password must be at least 6 characters.'); return; }
 
-  const users = getUsers();
-  if(users.find(u=>u.email===email)){
-    showAuthErr(err,'This email is already registered. Sign in instead.');
-    return;
+  const btn = document.querySelector('#login-mode .login-btn');
+  if(btn){ btn.textContent='Creating account…'; btn.disabled=true; }
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(cred.user, { displayName: name });
+    await setDoc(doc(db,'users', cred.user.uid), { name, email, createdAt: Date.now() });
+    // onAuthStateChanged will handle login flow
+  } catch(e) {
+    let msg = 'Registration failed. Please try again.';
+    if(e.code==='auth/email-already-in-use') msg='This email is already registered. Sign in instead.';
+    if(e.code==='auth/invalid-email')        msg='Please enter a valid email address.';
+    if(e.code==='auth/weak-password')        msg='Password must be at least 6 characters.';
+    showAuthErr(err, msg);
+  } finally {
+    if(btn){ btn.textContent='Create Account →'; btn.disabled=false; }
   }
-  const newUser = {name, email, pass};
-  users.push(newUser);
-  saveUsers(users);
-  startSession(newUser);
 }
 
 function startSession(user){
+  // kept for demo user compatibility
   currentUser = user;
-  localStorage.setItem('pp_session', JSON.stringify(user));
   document.getElementById('login-screen').style.display='none';
-  updateUserUI();
-  loadProgress();
-  updateDashStats();
-  renderDashTasks();
-  renderDashRecent();
-  renderCompanies();
-  renderLeaderboard();
-  renderHeatmap();
-  renderTasks('streak-tasks');
-  updateTaskProg();
+  updateUserUI(); loadProgress(); updateDashStats(); renderDashTasks();
+  renderDashRecent(); renderCompanies(); renderLeaderboard();
+  renderHeatmap(); renderTasks('streak-tasks'); updateTaskProg();
 }
 
-function doLogout(){
-  localStorage.removeItem('pp_session');
+async function doLogout(){
+  // Demo user
+  if(currentUser?.uid==='demo'){
+    currentUser = null;
+    dsaProblems = [...PROBLEMS];
+    tasks = [
+      {id:1,label:"Solve 1 Easy DSA problem",done:false,xp:20},
+      {id:2,label:"Complete 1 Mock Test",    done:false,xp:30},
+      {id:3,label:"Do 5-min AI Interview",   done:false,xp:50},
+    ];
+    document.getElementById('login-screen').style.display='flex';
+    document.getElementById('login-email').value='';
+    document.getElementById('login-pass').value='';
+    return;
+  }
+  try { await signOut(auth); } catch(e){}
   currentUser = null;
-  // Reset in-memory progress so next login starts clean
   dsaProblems = [...PROBLEMS];
   tasks = [
     {id:1,label:"Solve 1 Easy DSA problem",done:false,xp:20},
