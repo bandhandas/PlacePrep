@@ -3576,6 +3576,35 @@ document.addEventListener('keydown',e=>{
     closePatternDetail();
   }
 });
+function doLogin() {
+
+  const email = document.getElementById("login-email").value;
+  const password = document.getElementById("login-pass").value;
+
+  if(email === "demo@placeprep.in" && password === "demo123") {
+
+    document.getElementById("login-screen").style.display = "none";
+
+    alert("Login Successful");
+
+  } else {
+
+    document.getElementById("login-err").style.display = "block";
+
+    document.getElementById("login-err").innerText =
+      "Invalid email or password";
+
+  }
+}
+
+function fillDemo() {
+  document.getElementById("login-email").value = "demo@placeprep.in";
+  document.getElementById("login-pass").value = "demo123";
+}
+
+function doLogout() {
+  location.reload();
+}
 </script>
 </body>
 </html>
