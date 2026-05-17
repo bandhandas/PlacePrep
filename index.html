@@ -1823,8 +1823,8 @@ const DSA_PATTERNS=[
   ]},
 ];
 
-const PATTERN_CATS=['All','Array','String','Hash Map','Stack','Queue','Linked List','Trees','Recursion','Heap','DP','Greedy','Graphs','Bit Manipulation','Design'];
-let patternCat='All';
+const PATTERN_CATS=['Array','String','Hash Map','Stack','Queue','Linked List','Trees','Recursion','Heap','DP','Greedy','Graphs','Bit Manipulation','Design'];
+let patternCat='Array';
 const patternSolved={};
 const patternOpen={};
 try{const saved=JSON.parse(localStorage.getItem('placeprep_patsolved')||'{}');Object.assign(patternSolved,saved);}catch(e){}
@@ -1837,7 +1837,7 @@ function initPatterns(){
 function setPatternCat(c,btn){patternCat=c;document.querySelectorAll('#pattern-cat-pills .pill').forEach(p=>p.className='pill');btn.className='pill active-v';renderPatterns();}
 function renderPatterns(){
   const search=(document.getElementById('pattern-search')||{}).value||'';
-  const filtered=DSA_PATTERNS.filter(p=>{if(patternCat!=='All'&&p.cat!==patternCat)return false;if(search&&!p.name.toLowerCase().includes(search.toLowerCase()))return false;return true;});
+  const filtered=DSA_PATTERNS.filter(p=>{if(p.cat!==patternCat)return false;if(search&&!p.name.toLowerCase().includes(search.toLowerCase()))return false;return true;});
   const cnt=document.getElementById('pattern-count');if(cnt)cnt.textContent=`${filtered.length} pattern${filtered.length!==1?'s':''}`;
   const groups={};filtered.forEach(p=>{if(!groups[p.cat])groups[p.cat]=[];groups[p.cat].push(p);});
   let html='';
