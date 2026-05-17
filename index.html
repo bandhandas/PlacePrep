@@ -1191,7 +1191,7 @@ function authSignIn(){
   if(!email||!pass){showAuthError('Please enter your email and password.');return;}
   var users=getUsers();
   var user=users[email];
-  if(!user){showAuthError('No account found. Please create one first!');return;}
+  if(!user){showAuthError('No account found. Click "Create Account" above to register first.');return;}
   var hash=simpleHash(pass);
   if(user.passHash!==hash){showAuthError('Wrong password. Try again.');return;}
   var session={name:user.name,email:user.email,uid:'u'+simpleHash(email)};
@@ -1218,7 +1218,10 @@ function authRegister(){
   saveUsers(users);
   var session={name:name,email:email,uid:'u'+simpleHash(email)};
   saveSession(session);
+  // Show brief welcome before launching
   launchApp(session);
+  // Show a welcome toast
+  setTimeout(function(){showXPToast(100,'Welcome to PlacePrep, '+name+'!');},600);
 }
 
 function authGuest(){
@@ -1714,12 +1717,19 @@ initDSATopics();
 initPatterns();
 
 // Check for existing session
-const _existingSession = getSession();
+var _existingSession = getSession();
 if (_existingSession) {
   launchApp(_existingSession);
 } else {
   document.getElementById('auth-screen').style.display='flex';
   document.getElementById('app-wrapper').style.display='none';
+  // If no accounts exist yet, default to Create Account tab
+  var _existingUsers = getUsers();
+  if(Object.keys(_existingUsers).length === 0) {
+    authSwitchTab('register');
+  } else {
+    authSwitchTab('signin');
+  }
 }
 
 renderQuiz();
