@@ -10,9 +10,10 @@
 <br/>
 
 [![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-place--prep.vercel.app-7c3aed?style=for-the-badge&logoColor=white)](https://place--prep.vercel.app)
+
 [![DSA Tracker](https://img.shields.io/badge/📊%20DSA%20Tracker-60%20Problems-10b981?style=for-the-badge)](https://place--prep.vercel.app)
 [![Company Sheets](https://img.shields.io/badge/🏢%20Company%20Sheets-20+%20Companies-db2777?style=for-the-badge)](https://place--prep.vercel.app)
-[![AI Powered](https://img.shields.io/badge/🤖%20Powered%20by-Claude%20AI-06b6d4?style=for-the-badge)](https://place--prep.vercel.app)
+
 
 <br/>
 
