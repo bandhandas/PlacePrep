@@ -453,7 +453,10 @@ select option{background:#111827}
       </div>
       <div style="margin-bottom:16px">
         <div style="font-size:10px;font-weight:800;color:#6b7280;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px">PASSWORD</div>
-        <input id="auth-pass" type="password" placeholder="••••••••" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;color:#e8eaf0;font-size:13px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'" onkeydown="if(event.key==='Enter')authSignIn()"/>
+        <div style="position:relative">
+          <input id="auth-pass" type="password" placeholder="••••••••" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 44px 12px 14px;color:#e8eaf0;font-size:13px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'" onkeydown="if(event.key==='Enter')authSignIn()"/>
+          <button type="button" onclick="togglePassVis('auth-pass',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:#6b7280;padding:0;line-height:1">👁</button>
+        </div>
       </div>
       <div id="auth-error" style="display:none;background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.3);border-radius:8px;padding:10px 14px;font-size:12px;color:#f87171;margin-bottom:12px"></div>
       <button onclick="authSignIn()" style="width:100%;padding:13px;background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;font-size:14px;font-weight:800;border:none;border-radius:11px;cursor:pointer;font-family:inherit;margin-bottom:10px">Sign In →</button>
@@ -473,7 +476,10 @@ select option{background:#111827}
       </div>
       <div style="margin-bottom:16px">
         <div style="font-size:10px;font-weight:800;color:#6b7280;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px">PASSWORD (MIN 6 CHARS)</div>
-        <input id="auth-pass2" type="password" placeholder="••••••••" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 14px;color:#e8eaf0;font-size:13px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'" onkeydown="if(event.key==='Enter')authRegister()"/>
+        <div style="position:relative">
+          <input id="auth-pass2" type="password" placeholder="••••••••" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 44px 12px 14px;color:#e8eaf0;font-size:13px;font-family:inherit;outline:none" onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'" onkeydown="if(event.key==='Enter')authRegister()"/>
+          <button type="button" onclick="togglePassVis('auth-pass2',this)" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:#6b7280;padding:0;line-height:1">👁</button>
+        </div>
       </div>
       <div id="auth-error-reg" style="display:none;background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.3);border-radius:8px;padding:10px 14px;font-size:12px;color:#f87171;margin-bottom:12px"></div>
       <button onclick="authRegister()" style="width:100%;padding:13px;background:linear-gradient(135deg,#7c3aed,#db2777);color:#fff;font-size:14px;font-weight:800;border:none;border-radius:11px;cursor:pointer;font-family:inherit;margin-bottom:10px">Create Account →</button>
@@ -1143,133 +1149,183 @@ function updateTaskProg(){const done=tasks.filter(t=>t.done).length;const prog=d
 // Users stored as: pp_users = { email: {name, email, passHash} }
 // Session stored as: pp_session = { name, email, uid }
 
-// ── AUTH HELPERS ──
-// Hash must be deterministic and always positive
-function simpleHash(str){
-  var h=5381;
-  for(var i=0;i<str.length;i++){h=((h<<5)+h)+str.charCodeAt(i);}
-  // Force unsigned 32-bit, then hex
-  return (h>>>0).toString(16);
+function togglePassVis(inputId, btn){
+  var inp = document.getElementById(inputId);
+  if(!inp) return;
+  var isHidden = inp.type === 'password';
+  inp.type = isHidden ? 'text' : 'password';
+  btn.textContent = isHidden ? '🙈' : '👁';
 }
 
-function getUsers(){
-  try{var v=localStorage.getItem('pp_users');return v?JSON.parse(v):{};}
-  catch(e){return {};}
+// ── AUTH HELPERS ──
+// Uses plain-text password storage (local single-file app, no server)
+// Key: 'placeprep_accounts' — fixed name so it survives file renames
+
+var AUTH_KEY = 'placeprep_accounts';
+var SESSION_KEY = 'placeprep_session';
+
+function ppGetAccounts(){
+  try{
+    var v = localStorage.getItem(AUTH_KEY);
+    return v ? JSON.parse(v) : {};
+  } catch(e){ return {}; }
 }
-function saveUsers(u){
-  try{localStorage.setItem('pp_users',JSON.stringify(u));}catch(e){}
+
+function ppSaveAccounts(obj){
+  try{
+    localStorage.setItem(AUTH_KEY, JSON.stringify(obj));
+    return true;
+  } catch(e){ return false; }
 }
-function getSession(){
-  try{var v=localStorage.getItem('pp_session');return v?JSON.parse(v):null;}
-  catch(e){return null;}
+
+function ppGetSession(){
+  try{
+    var v = localStorage.getItem(SESSION_KEY);
+    return v ? JSON.parse(v) : null;
+  } catch(e){ return null; }
 }
-function saveSession(s){
-  try{localStorage.setItem('pp_session',JSON.stringify(s));}catch(e){}
+
+function ppSaveSession(s){
+  try{ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch(e){}
 }
-function clearSession(){
-  try{localStorage.removeItem('pp_session');}catch(e){}
+
+function ppClearSession(){
+  try{ localStorage.removeItem(SESSION_KEY); } catch(e){}
 }
+
+// Alias old names so nothing else breaks
+function getSession(){ return ppGetSession(); }
+function getUsers(){ return ppGetAccounts(); }
 
 function showAuthError(msg){
-  var regForm=document.getElementById('auth-register-form');
-  var isReg=regForm&&regForm.style.display!=='none';
-  var el=document.getElementById(isReg?'auth-error-reg':'auth-error');
-  if(el){el.textContent=msg;el.style.display='block';}
+  var regForm = document.getElementById('auth-register-form');
+  var isReg = regForm && regForm.style.display !== 'none';
+  var el = document.getElementById(isReg ? 'auth-error-reg' : 'auth-error');
+  if(el){ el.textContent = msg; el.style.display = 'block'; }
 }
+
 function hideAuthError(){
-  var ids=['auth-error','auth-error-reg'];
-  ids.forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+  ['auth-error','auth-error-reg'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.style.display = 'none';
+  });
 }
 
 function authSignIn(){
   hideAuthError();
-  var emailEl=document.getElementById('auth-email');
-  var passEl=document.getElementById('auth-pass');
-  if(!emailEl||!passEl)return;
-  var email=emailEl.value.trim().toLowerCase();
-  var pass=passEl.value;
-  if(!email||!pass){showAuthError('Please enter your email and password.');return;}
-  var users=getUsers();
-  var user=users[email];
-  if(!user){showAuthError('No account found. Click "Create Account" above to register first.');return;}
-  var hash=simpleHash(pass);
-  if(user.passHash!==hash){showAuthError('Wrong password. Try again.');return;}
-  var session={name:user.name,email:user.email,uid:'u'+simpleHash(email)};
-  saveSession(session);
+  var email = (document.getElementById('auth-email').value || '').trim().toLowerCase();
+  var pass  = (document.getElementById('auth-pass').value  || '');
+  if(!email || !pass){ showAuthError('Please enter your email and password.'); return; }
+
+  var accounts = ppGetAccounts();
+  var acct = accounts[email];
+
+  if(!acct){
+    showAuthError('No account found for ' + email + '. Please create one first.');
+    return;
+  }
+  if(acct.password !== pass){
+    showAuthError('Wrong password. Try again.');
+    return;
+  }
+  var session = {name: acct.name, email: acct.email};
+  ppSaveSession(session);
   launchApp(session);
 }
 
 function authRegister(){
   hideAuthError();
-  var nameEl=document.getElementById('auth-name');
-  var emailEl=document.getElementById('auth-email2');
-  var passEl=document.getElementById('auth-pass2');
-  if(!nameEl||!emailEl||!passEl)return;
-  var name=nameEl.value.trim();
-  var email=emailEl.value.trim().toLowerCase();
-  var pass=passEl.value;
-  if(!name||!email||!pass){showAuthError('Please fill in all fields.');return;}
-  if(pass.length<6){showAuthError('Password must be at least 6 characters.');return;}
-  if(email.indexOf('@')<1||email.indexOf('.')<0){showAuthError('Please enter a valid email.');return;}
-  var users=getUsers();
-  if(users[email]){showAuthError('Account already exists. Please sign in instead.');return;}
-  var hash=simpleHash(pass);
-  users[email]={name:name,email:email,passHash:hash};
-  saveUsers(users);
-  var session={name:name,email:email,uid:'u'+simpleHash(email)};
-  saveSession(session);
-  // Show brief welcome before launching
+  var name  = (document.getElementById('auth-name').value   || '').trim();
+  var email = (document.getElementById('auth-email2').value || '').trim().toLowerCase();
+  var pass  = (document.getElementById('auth-pass2').value  || '');
+
+  if(!name || !email || !pass){ showAuthError('Please fill in all fields.'); return; }
+  if(pass.length < 6){ showAuthError('Password must be at least 6 characters.'); return; }
+  if(email.indexOf('@') < 1){ showAuthError('Please enter a valid email.'); return; }
+
+  var accounts = ppGetAccounts();
+  if(accounts[email]){
+    showAuthError('Account already exists. Please sign in instead.');
+    return;
+  }
+
+  // Save account with plain password
+  accounts[email] = { name: name, email: email, password: pass };
+  var saved = ppSaveAccounts(accounts);
+
+  if(!saved){
+    showAuthError('Could not save account. Try a different browser.');
+    return;
+  }
+
+  // Verify it actually saved
+  var verify = ppGetAccounts();
+  if(!verify[email]){
+    showAuthError('Save failed — localStorage may be blocked. Try enabling it in browser settings.');
+    return;
+  }
+
+  var session = {name: name, email: email};
+  ppSaveSession(session);
   launchApp(session);
-  // Show a welcome toast
-  setTimeout(function(){showXPToast(100,'Welcome to PlacePrep, '+name+'!');},600);
+  setTimeout(function(){ showXPToast(100, 'Welcome to PlacePrep, ' + name + '!'); }, 600);
 }
 
 function authGuest(){
-  var session={name:'Guest',email:'guest',uid:'guest',isGuest:true};
+  var session = {name: 'Guest', email: 'guest', isGuest: true};
   launchApp(session);
 }
 
 function authSwitchTab(tab){
-  var siForm=document.getElementById('auth-signin-form');
-  var regForm=document.getElementById('auth-register-form');
-  var tabSI=document.getElementById('auth-tab-signin');
-  var tabReg=document.getElementById('auth-tab-register');
-  if(siForm) siForm.style.display=tab==='signin'?'block':'none';
-  if(regForm) regForm.style.display=tab==='register'?'block':'none';
+  var siForm  = document.getElementById('auth-signin-form');
+  var regForm = document.getElementById('auth-register-form');
+  var tabSI   = document.getElementById('auth-tab-signin');
+  var tabReg  = document.getElementById('auth-tab-register');
+  if(siForm)  siForm.style.display  = tab === 'signin'   ? 'block' : 'none';
+  if(regForm) regForm.style.display = tab === 'register' ? 'block' : 'none';
+  var activeStyle   = 'linear-gradient(135deg,#7c3aed,#db2777)';
+  var inactiveStyle = 'transparent';
   if(tabSI){
-    tabSI.style.background=tab==='signin'?'linear-gradient(135deg,#7c3aed,#db2777)':'transparent';
-    tabSI.style.color=tab==='signin'?'#fff':'#6b7280';
+    tabSI.style.background = tab === 'signin' ? activeStyle : inactiveStyle;
+    tabSI.style.color      = tab === 'signin' ? '#fff' : '#6b7280';
   }
   if(tabReg){
-    tabReg.style.background=tab==='register'?'linear-gradient(135deg,#7c3aed,#db2777)':'transparent';
-    tabReg.style.color=tab==='register'?'#fff':'#6b7280';
+    tabReg.style.background = tab === 'register' ? activeStyle : inactiveStyle;
+    tabReg.style.color      = tab === 'register' ? '#fff' : '#6b7280';
   }
   hideAuthError();
 }
 
 function logout(){
-  clearSession();
-  var app=document.getElementById('app-wrapper');
-  var auth=document.getElementById('auth-screen');
-  if(app) app.style.display='none';
-  if(auth) auth.style.display='flex';
-  // Clear input fields
+  ppClearSession();
+  var app  = document.getElementById('app-wrapper');
+  var auth = document.getElementById('auth-screen');
+  if(app)  app.style.display  = 'none';
+  if(auth) auth.style.display = 'flex';
   ['auth-email','auth-pass','auth-name','auth-email2','auth-pass2'].forEach(function(id){
-    var el=document.getElementById(id);if(el)el.value='';
+    var el = document.getElementById(id);
+    if(el) el.value = '';
   });
-  authSwitchTab('signin');
+  // If accounts exist, go to sign-in tab; else go to register
+  var accounts = ppGetAccounts();
+  authSwitchTab(Object.keys(accounts).length > 0 ? 'signin' : 'register');
 }
 
 function launchApp(session){
-  currentUser={name:session.name,email:session.email,uid:session.uid,isGuest:!!session.isGuest};
-  var auth=document.getElementById('auth-screen');
-  var app=document.getElementById('app-wrapper');
-  if(auth) auth.style.display='none';
-  if(app) app.style.display='flex';
-  renderCompanies();renderLeaderboard();initChat();
-  updateUserUI();loadProgress();updateDashStats();
-  renderDashTasks();renderDashRecent();renderHeatmap();
-  renderTasks('streak-tasks');updateTaskProg();
+  currentUser = {
+    name: session.name,
+    email: session.email,
+    uid: session.email,
+    isGuest: !!session.isGuest
+  };
+  var auth = document.getElementById('auth-screen');
+  var app  = document.getElementById('app-wrapper');
+  if(auth) auth.style.display = 'none';
+  if(app)  app.style.display  = 'flex';
+  renderCompanies(); renderLeaderboard(); initChat();
+  updateUserUI(); loadProgress(); updateDashStats();
+  renderDashTasks(); renderDashRecent(); renderHeatmap();
+  renderTasks('streak-tasks'); updateTaskProg();
 }
 
 // ── PROGRESS ──
@@ -1717,14 +1773,13 @@ initDSATopics();
 initPatterns();
 
 // Check for existing session
-var _existingSession = getSession();
+var _existingSession = ppGetSession();
 if (_existingSession) {
   launchApp(_existingSession);
 } else {
   document.getElementById('auth-screen').style.display='flex';
   document.getElementById('app-wrapper').style.display='none';
-  // If no accounts exist yet, default to Create Account tab
-  var _existingUsers = getUsers();
+  var _existingUsers = ppGetAccounts();
   if(Object.keys(_existingUsers).length === 0) {
     authSwitchTab('register');
   } else {
